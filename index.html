@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lagrangian Cart + Double Pendulum</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --panel: #191b20;
+      --panel-2: #20242a;
+      --text: #f5f2ea;
+      --muted: #a7adba;
+      --line: #343945;
+      --accent: #56d0ff;
+      --gold: #f4c95d;
+      --red: #ff6b6b;
+      --green: #83e377;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      min-height: 100vh;
+    }
+
+    .stage {
+      position: relative;
+      min-height: 620px;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        radial-gradient(circle at 26% 16%, rgba(86, 208, 255, 0.18), transparent 32%),
+        #0b0c0f;
+      background-size: 48px 48px, 48px 48px, auto, auto;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .formula {
+      position: absolute;
+      top: 12px;
+      left: 14px;
+      max-width: min(390px, calc(100% - 28px));
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      background: rgba(12, 14, 18, 0.72);
+      backdrop-filter: blur(12px);
+      border-radius: 8px;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+    }
+
+    .formula h1 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .formula .math {
+      margin: 3px 0;
+      color: #fffaf0;
+      font-family: Cambria, Georgia, serif;
+      font-size: clamp(15px, 1.7vw, 20px);
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+
+    aside {
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      padding: 18px;
+      overflow-y: auto;
+    }
+
+    .section {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section:first-child {
+      padding-top: 0;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .stats {
+      display: grid;
+      gap: 8px;
+    }
+
+    .stat {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 10px;
+      align-items: baseline;
+      padding: 10px 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .stat span:first-child {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stat strong {
+      font-variant-numeric: tabular-nums;
+      font-size: 18px;
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      margin: 14px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .label-row b {
+      color: var(--text);
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px 12px;
+      background: var(--panel-2);
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: rgba(86, 208, 255, 0.75);
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .legend {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .key {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 8px;
+      border-radius: 999px;
+      vertical-align: -1px;
+    }
+
+    @media (max-width: 880px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .stage {
+        min-height: 560px;
+      }
+
+      .formula {
+        top: 14px;
+        left: 14px;
+        max-width: calc(100% - 28px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="stage" aria-label="Simulation canvas">
+      <canvas id="sim"></canvas>
+      <div class="formula">
+        <h1>Cart with m2 hanging below m1</h1>
+        <div class="math">L = T - V</div>
+        <div class="math">T = 1/2 M x_dot^2 + 1/2 m1 v1^2 + 1/2 m2 v2^2</div>
+        <div class="math">V = -m1 g y1 - m2 g y2</div>
+      </div>
+    </section>
+
+    <aside>
+      <section class="section">
+        <h2>Live Energy</h2>
+        <div class="stats">
+          <div class="stat"><span>T</span><strong id="tVal">0.00</strong></div>
+          <div class="stat"><span>V</span><strong id="vVal">0.00</strong></div>
+          <div class="stat"><span>L</span><strong id="lVal">0.00</strong></div>
+        </div>
+        <div class="legend">
+          <div><span class="key" style="background: var(--accent)"></span>m1 position and path</div>
+          <div><span class="key" style="background: var(--gold)"></span>m2 hanging from m1</div>
+          <div><span class="key" style="background: var(--green)"></span>cart position x</div>
+          <div><span class="key" style="background: var(--red)"></span>force bars on cart</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Controls</h2>
+        <label>
+          <span class="label-row"><span>Mass M</span><b id="massMOut">5.0</b></span>
+          <input id="massM" type="range" min="1" max="12" value="5" step="0.1">
+        </label>
+        <label>
+          <span class="label-row"><span>Mass m1</span><b id="mass1Out">1.7</b></span>
+          <input id="mass1" type="range" min="0.4" max="5" value="1.7" step="0.1">
+        </label>
+        <label>
+          <span class="label-row"><span>Mass m2</span><b id="mass2Out">1.1</b></span>
+          <input id="mass2" type="range" min="0.4" max="5" value="1.1" step="0.1">
+        </label>
+        <label>
+          <span class="label-row"><span>Gravity g</span><b id="gravityOut">9.8</b></span>
+          <input id="gravity" type="range" min="1" max="18" value="9.8" step="0.1">
+        </label>
+        <label>
+          <span class="label-row"><span>Cart drive</span><b id="driveOut">1.4</b></span>
+          <input id="drive" type="range" min="0" max="4" value="1.4" step="0.1">
+        </label>
+        <div class="buttons">
+          <button id="pauseBtn" type="button">Pause</button>
+          <button id="resetBtn" type="button">Reset</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>What You Are Seeing</h2>
+        <p class="note">
+          The cart contributes the first kinetic-energy term. The first bob hangs from the cart,
+          and the second bob hangs below the first. Each bob contributes its own kinetic energy
+          and gravitational potential energy.
+        </p>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("sim");
+    const ctx = canvas.getContext("2d");
+    const els = {
+      tVal: document.getElementById("tVal"),
+      vVal: document.getElementById("vVal"),
+      lVal: document.getElementById("lVal"),
+      massM: document.getElementById("massM"),
+      mass1: document.getElementById("mass1"),
+      mass2: document.getElementById("mass2"),
+      gravity: document.getElementById("gravity"),
+      drive: document.getElementById("drive"),
+      massMOut: document.getElementById("massMOut"),
+      mass1Out: document.getElementById("mass1Out"),
+      mass2Out: document.getElementById("mass2Out"),
+      gravityOut: document.getElementById("gravityOut"),
+      driveOut: document.getElementById("driveOut"),
+      pauseBtn: document.getElementById("pauseBtn"),
+      resetBtn: document.getElementById("resetBtn")
+    };
+
+    const state = {
+      time: 0,
+      paused: false,
+      trail1: [],
+      trail2: [],
+      trailDirect1: [],
+      trailDirect2: []
+    };
+
+    function readParams() {
+      const p = {
+        M: Number(els.massM.value),
+        m1: Number(els.mass1.value),
+        m2: Number(els.mass2.value),
+        g: Number(els.gravity.value),
+        drive: Number(els.drive.value)
+      };
+      els.massMOut.textContent = p.M.toFixed(1);
+      els.mass1Out.textContent = p.m1.toFixed(1);
+      els.mass2Out.textContent = p.m2.toFixed(1);
+      els.gravityOut.textContent = p.g.toFixed(1);
+      els.driveOut.textContent = p.drive.toFixed(1);
+      return p;
+    }
+
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function sample(t, p) {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const trackTop = height * 0.46;
+      const trackBottom = height * 0.82;
+      const centerX = width / 2;
+      const scale = Math.min(width, height) / 8.5;
+      const cartAmp = Math.min(scale * 0.95 * p.drive, width * 0.18);
+      const cartOmega = 0.82;
+
+      const l1 = scale * 1.25;
+      const l2 = scale * 0.95;
+      const theta1 = 0.72 * Math.sin(1.65 * t + 0.25) + 0.2 * Math.sin(2.7 * t);
+      const theta2 = -0.98 * Math.sin(1.25 * t + 1.1) + 0.16 * Math.sin(3.2 * t);
+      const theta1Dot = 0.72 * 1.65 * Math.cos(1.65 * t + 0.25) + 0.2 * 2.7 * Math.cos(2.7 * t);
+      const theta2Dot = -0.98 * 1.25 * Math.cos(1.25 * t + 1.1) + 0.16 * 3.2 * Math.cos(3.2 * t);
+      const totalMass = p.M + p.m1 + p.m2;
+      const sharedDrive = cartAmp * 0.76 * Math.sin(cartOmega * t);
+      const sharedDriveDot = cartAmp * 0.76 * cartOmega * Math.cos(cartOmega * t);
+      const couplingScale = scale * p.drive * 0.72 / totalMass;
+      const chainPull = p.m1 * Math.sin(theta1) + p.m2 * Math.sin(theta1 + 0.65 * theta2);
+      const directPull = p.m1 * Math.sin(theta1) + p.m2 * Math.sin(theta2);
+      const chainPullDot = p.m1 * Math.cos(theta1) * theta1Dot + p.m2 * Math.cos(theta1 + 0.65 * theta2) * (theta1Dot + 0.65 * theta2Dot);
+      const directPullDot = p.m1 * Math.cos(theta1) * theta1Dot + p.m2 * Math.cos(theta2) * theta2Dot;
+      const xChain = sharedDrive - couplingScale * chainPull;
+      const xDirect = sharedDrive - couplingScale * directPull;
+      const xChainDot = sharedDriveDot - couplingScale * chainPullDot;
+      const xDirectDot = sharedDriveDot - couplingScale * directPullDot;
+
+      const buildRig = (trackY, mode, x, xDot) => {
+        const pivot = { x: centerX + x, y: trackY - 58 };
+        const p1 = {
+          x: pivot.x + l1 * Math.sin(theta1),
+          y: pivot.y + l1 * Math.cos(theta1)
+        };
+        const p2 = mode === "chain" ? {
+          x: p1.x + l2 * Math.sin(theta2),
+          y: p1.y + l2 * Math.cos(theta2)
+        } : {
+          x: pivot.x + l2 * Math.sin(theta2),
+          y: pivot.y + l2 * Math.cos(theta2)
+        };
+        return { centerX, trackY, mode, pivot, p1, p2, x, xDot };
+      };
+
+      const chain = buildRig(trackTop, "chain", xChain, xChainDot);
+      const direct = buildRig(trackBottom, "direct", xDirect, xDirectDot);
+
+      const v1x = xChainDot + l1 * Math.cos(theta1) * theta1Dot;
+      const v1y = -l1 * Math.sin(theta1) * theta1Dot;
+      const v2x = v1x + l2 * Math.cos(theta2) * theta2Dot;
+      const v2y = v1y - l2 * Math.sin(theta2) * theta2Dot;
+      const v1 = Math.hypot(v1x, v1y) / scale;
+      const v2 = Math.hypot(v2x, v2y) / scale;
+
+      const y1 = (chain.trackY - chain.p1.y) / scale;
+      const y2 = (chain.trackY - chain.p2.y) / scale;
+      const cartV = xChainDot / scale;
+      const T = 0.5 * p.M * cartV * cartV + 0.5 * p.m1 * v1 * v1 + 0.5 * p.m2 * v2 * v2;
+      const V = -p.m1 * p.g * y1 - p.m2 * p.g * y2;
+      const force1 = p.m1 * (p.g * Math.sin(theta1) + (l1 / scale) * theta1Dot * theta1Dot * Math.sin(theta1));
+      const chainForce2 = p.m2 * (p.g * Math.sin(theta1 + 0.65 * theta2) + (l2 / scale) * theta2Dot * theta2Dot * Math.sin(theta1 + 0.65 * theta2));
+      const directForce2 = p.m2 * (p.g * Math.sin(theta2) + (l2 / scale) * theta2Dot * theta2Dot * Math.sin(theta2));
+
+      return { width, height, scale, centerX, chain, direct, force1, chainForce2, directForce2, T, V, L: T - V };
+    }
+
+    function drawTrail(points, color) {
+      if (points.length < 2) return;
+      ctx.lineWidth = 2;
+      for (let i = 1; i < points.length; i += 1) {
+        const alpha = i / points.length;
+        ctx.strokeStyle = color.replace("ALPHA", alpha * 0.45);
+        ctx.beginPath();
+        ctx.moveTo(points[i - 1].x, points[i - 1].y);
+        ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+      }
+    }
+
+    function draw(s, p) {
+      ctx.clearRect(0, 0, s.width, s.height);
+      ctx.save();
+
+      drawTrack(s, s.chain, "chain setup");
+      drawTrack(s, s.direct, "direct setup");
+
+      drawTrail(state.trail1, "rgba(86, 208, 255, ALPHA)");
+      drawTrail(state.trail2, "rgba(244, 201, 93, ALPHA)");
+      drawTrail(state.trailDirect1, "rgba(86, 208, 255, ALPHA)");
+      drawTrail(state.trailDirect2, "rgba(244, 201, 93, ALPHA)");
+
+      drawRig(s, p, s.chain, "m2 below m1");
+      drawRig(s, p, s.direct, "both from cart");
+
+      ctx.restore();
+    }
+
+    function drawTrack(s, rig, label) {
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(48, rig.trackY);
+      ctx.lineTo(s.width - 48, rig.trackY);
+      ctx.stroke();
+      drawTrackRuler(s, rig.centerX, 48, s.width - 48, rig.trackY, label);
+    }
+
+    function drawRig(s, p, rig, title) {
+      const cartW = 150 + p.M * 5;
+      const cartH = 46;
+      const cartX = rig.pivot.x - cartW / 2;
+      const cartY = rig.pivot.y - cartH / 2;
+
+      ctx.fillStyle = "rgba(245,242,234,0.86)";
+      ctx.font = "700 13px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(title, rig.centerX, cartY - 8);
+
+      ctx.fillStyle = "#242b32";
+      ctx.strokeStyle = "#83e377";
+      ctx.lineWidth = 3;
+      roundRect(cartX, cartY, cartW, cartH, 8);
+      ctx.fill();
+      ctx.stroke();
+      const force2 = rig.mode === "chain" ? s.chainForce2 : s.directForce2;
+      forceBar(rig.pivot.x, cartY + 15, s.force1, "#56d0ff", "F m1");
+      forceBar(rig.pivot.x, cartY + 31, force2, "#f4c95d", "F m2");
+
+      ctx.fillStyle = "#0b0c0f";
+      ctx.beginPath();
+      ctx.arc(cartX + 34, cartY + cartH + 10, 12, 0, Math.PI * 2);
+      ctx.arc(cartX + cartW - 34, cartY + cartH + 10, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.82)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(rig.pivot.x, rig.pivot.y);
+      ctx.lineTo(rig.p1.x, rig.p1.y);
+      ctx.moveTo(rig.mode === "chain" ? rig.p1.x : rig.pivot.x, rig.mode === "chain" ? rig.p1.y : rig.pivot.y);
+      ctx.lineTo(rig.p2.x, rig.p2.y);
+      ctx.stroke();
+
+      ctx.fillStyle = "#f5f2ea";
+      ctx.beginPath();
+      ctx.arc(rig.pivot.x, rig.pivot.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      bob(rig.p1, 13 + p.m1 * 2.5, "#56d0ff", "m1");
+      bob(rig.p2, 13 + p.m2 * 2.5, "#f4c95d", "m2");
+
+      ctx.fillStyle = "rgba(131, 227, 119, 0.88)";
+      ctx.font = "600 14px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(`x = ${(rig.x / s.scale).toFixed(2)}`, rig.pivot.x, rig.trackY + 44);
+      ctx.textAlign = "start";
+    }
+
+    function drawTrackRuler(s, centerX, startX, endX, trackY, label) {
+      const unitPx = s.scale * 0.5;
+      const maxTick = Math.floor(Math.min(centerX - startX, endX - centerX) / unitPx);
+
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.font = "600 11px Inter, sans-serif";
+
+      for (let tick = -maxTick; tick <= maxTick; tick += 1) {
+        const x = centerX + tick * unitPx;
+        const isZero = tick === 0;
+        const isMajor = tick % 2 === 0;
+        const tickLength = isZero ? 24 : isMajor ? 16 : 10;
+        ctx.strokeStyle = isZero ? "rgba(131, 227, 119, 0.95)" : "rgba(255,255,255,0.36)";
+        ctx.lineWidth = isZero ? 3 : 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x, trackY - tickLength);
+        ctx.lineTo(x, trackY + tickLength);
+        ctx.stroke();
+
+        if (isZero || isMajor) {
+          ctx.fillStyle = isZero ? "rgba(131, 227, 119, 0.95)" : "rgba(245,242,234,0.72)";
+          ctx.fillText((tick * 0.5).toFixed(isZero ? 0 : 1), x, trackY + tickLength + 4);
+        }
+      }
+
+      ctx.strokeStyle = "rgba(131, 227, 119, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(centerX, trackY - 56);
+      ctx.lineTo(centerX, trackY + 34);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(245,242,234,0.76)";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(label, centerX, trackY - 60);
+      ctx.restore();
+    }
+
+    function forceBar(originX, y, force, color, label) {
+      const direction = force >= 0 ? 1 : -1;
+      const length = Math.min(72, 14 + Math.abs(force) * 2.8);
+      const endX = originX + direction * length;
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(originX, y - 7);
+      ctx.lineTo(originX, y + 7);
+      ctx.stroke();
+
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(originX, y);
+      ctx.lineTo(endX, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(endX, y);
+      ctx.lineTo(endX - direction * 8, y - 5);
+      ctx.lineTo(endX - direction * 8, y + 5);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.font = "700 10px Inter, sans-serif";
+      ctx.textAlign = direction > 0 ? "left" : "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, endX + direction * 8, y);
+      ctx.restore();
+    }
+
+    function bob(point, radius, color, label) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#101114";
+      ctx.font = "700 13px Inter, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, point.x, point.y);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
+    }
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function update(dt) {
+      const p = readParams();
+      if (!state.paused) {
+        state.time += dt;
+      }
+      const s = sample(state.time, p);
+      if (!state.paused) {
+        state.trail1.push({ x: s.chain.p1.x, y: s.chain.p1.y });
+        state.trail2.push({ x: s.chain.p2.x, y: s.chain.p2.y });
+        state.trailDirect1.push({ x: s.direct.p1.x, y: s.direct.p1.y });
+        state.trailDirect2.push({ x: s.direct.p2.x, y: s.direct.p2.y });
+        state.trail1 = state.trail1.slice(-120);
+        state.trail2 = state.trail2.slice(-120);
+        state.trailDirect1 = state.trailDirect1.slice(-120);
+        state.trailDirect2 = state.trailDirect2.slice(-120);
+      }
+      els.tVal.textContent = s.T.toFixed(2);
+      els.vVal.textContent = s.V.toFixed(2);
+      els.lVal.textContent = s.L.toFixed(2);
+      draw(s, p);
+    }
+
+    let last = performance.now();
+    function frame(now) {
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+      update(dt);
+      requestAnimationFrame(frame);
+    }
+
+    els.pauseBtn.addEventListener("click", () => {
+      state.paused = !state.paused;
+      els.pauseBtn.textContent = state.paused ? "Play" : "Pause";
+    });
+
+    els.resetBtn.addEventListener("click", () => {
+      state.time = 0;
+      state.trail1 = [];
+      state.trail2 = [];
+      state.trailDirect1 = [];
+      state.trailDirect2 = [];
+    });
+
+    window.addEventListener("resize", resize);
+    resize();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
