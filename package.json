@@ -1,0 +1,10 @@
+{
+  "name": "pendulum-motion-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive Lagrangian cart and pendulum comparison simulation.",
+  "scripts": {
+    "start": "npx serve .",
+    "deploy": "wrangler pages deploy . --project-name pendulum-motion-lab"
+  }
+}
